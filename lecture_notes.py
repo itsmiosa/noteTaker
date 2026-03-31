@@ -17,7 +17,6 @@ API key:
 
 import argparse
 import sys
-import torch_directml
 from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
