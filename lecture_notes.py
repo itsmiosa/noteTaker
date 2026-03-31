@@ -22,9 +22,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
 
-
-# ── Helpers ──────────────────────────────────────────────────────────────────
-
 def transcribe(audio_path: str, model_size: str) -> str:
     """Transcribe audio using local OpenAI Whisper."""
     try:
