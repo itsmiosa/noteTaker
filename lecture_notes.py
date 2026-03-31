@@ -87,13 +87,12 @@ def generate_notes(transcript: str, api_key: str | None) -> str:
     print("[3/3] Generating notes with Gemini …")
 
     prompt = f"""You are an expert note-taker. Below is a transcript of a class lecture.
-Produce comprehensive, well-structured notes in Markdown. Include exactly these five sections:
+Produce comprehensive, well-structured notes in Markdown. Include exactly these four sections:
 
 1. **Summary** — 3–5 sentence overview of the entire lecture.
 2. **Key Points** — Bullet list of the most important concepts, facts, and arguments.
 3. **Headings & Sections** — Re-organise the lecture content into clearly labelled sections with sub-bullets. Use ## for main headings and ### for sub-headings.
-4. **Glossary** — A definition list of every technical term, proper noun, or concept introduced. Format: **term** — definition.
-5. **Review Questions** — 5–8 questions a student could use to test their understanding.
+4. **Review Questions** — 5–8 questions a student could use to test their understanding.
 
 Keep the notes factual and grounded in the transcript. Do not invent content.
 
