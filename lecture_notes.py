@@ -3,7 +3,7 @@
 lecture_notes.py — Transcribe a class recording and generate structured notes.
 
 Requirements:
-    pip install openai-whisper google-generativeai
+    pip install openai-whisper google-genai
 
 Usage:
     python lecture_notes.py recording.mp3
@@ -46,9 +46,9 @@ def transcribe(audio_path: str, model_size: str) -> str:
 def generate_notes(transcript: str, api_key: str | None) -> str:
     """Send transcript to Gemini and get back structured notes."""
     try:
-        import google.generativeai as genai
+        from google import genai
     except ImportError:
-        print("ERROR: google-generativeai not installed. Run:  pip install google-generativeai")
+        print("ERROR: google-geneai not installed. Run:  pip install google-genai")
         sys.exit(1)
 
     import os
@@ -58,8 +58,7 @@ def generate_notes(transcript: str, api_key: str | None) -> str:
         print("       Get a free key at: https://aistudio.google.com")
         sys.exit(1)
 
-    genai.configure(api_key=key)
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    client = genai.Client(api_key=key)
 
     print("[3/3] Generating notes with Gemini …")
 
@@ -79,7 +78,10 @@ TRANSCRIPT:
 {transcript}
 """
 
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents=prompt,
+)
     return response.text
 
 
