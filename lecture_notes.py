@@ -3,7 +3,7 @@
 lecture_notes.py — Transcribe a class recording and generate structured notes.
 
 Requirements:
-    pip install openai-whisper google-genai
+    pip install openai-whisper google-genai torch-directml
 
 Usage:
     python lecture_notes.py recording.mp3
@@ -17,6 +17,7 @@ API key:
 
 import argparse
 import sys
+import torch_directml
 from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()
@@ -28,15 +29,42 @@ def transcribe(audio_path: str, model_size: str) -> str:
     """Transcribe audio using local OpenAI Whisper."""
     try:
         import whisper
+        import torch
     except ImportError:
-        print("ERROR: whisper not installed. Run:  pip install openai-whisper")
+        print("ERROR: whisper or torch not installed.")
         sys.exit(1)
 
-    print(f"[1/3] Loading Whisper model '{model_size}' …")
-    model = whisper.load_model(model_size)
+    # Automatically determine the best hardware
+    device_name = "CPU"
+    device_target = "cpu"
+    use_fp16 = True
+
+    if torch.cuda.is_available():
+        device_name = "NVIDIA GPU"
+        device_target = "cuda"
+    else:
+        try:
+            import torch_directml
+            device_name = "AMD/DirectML"
+            device_target = torch_directml.device()
+            use_fp16 = False # Prevent AMD crashes
+        except ImportError:
+            pass # Default to CPU
+
+    print(f"[1/3] Loading Whisper model '{model_size}' to {device_name} …")
+    
+    # Always load to CPU first to prevent deserialization crashes
+    model = whisper.load_model(model_size, device="cpu")
+
+    # Apply the sparse tensor fix only if using DirectML
+    if "dml" in str(device_target).lower():
+        model.alignment_heads = model.alignment_heads.to_dense()
+
+    # Move model to the final detected hardware
+    model = model.to(device_target)
 
     print(f"[2/3] Transcribing '{audio_path}' …  (this may take a minute)")
-    result = model.transcribe(audio_path, verbose=False)
+    result = model.transcribe(audio_path, verbose=False, fp16=use_fp16)
     transcript = result["text"].strip()
 
     print(f"      Done — {len(transcript.split()):,} words transcribed.")
@@ -48,7 +76,7 @@ def generate_notes(transcript: str, api_key: str | None) -> str:
     try:
         from google import genai
     except ImportError:
-        print("ERROR: google-geneai not installed. Run:  pip install google-genai")
+        print("ERROR: google-genai not installed. Run:  pip install google-genai")
         sys.exit(1)
 
     import os
@@ -79,9 +107,9 @@ TRANSCRIPT:
 """
 
     response = client.models.generate_content(
-    model="gemini-2.5-flash",
-    contents=prompt,
-)
+        model="gemini-2.5-flash",
+        contents=prompt,
+    )
     return response.text
 
 
@@ -114,6 +142,11 @@ def main():
         help="Output markdown file (default: <audio_name>_notes.md)",
     )
     parser.add_argument(
+        "--output-dir",
+        default="./summarized_text",
+        help="Output directory for transcript and notes (default: ./summarized_text)",
+    )
+    parser.add_argument(
         "--api-key",
         default=None,
         help="Gemini API key (default: reads GEMINI_API_KEY env var)",
@@ -125,14 +158,18 @@ def main():
         print(f"ERROR: File not found: {audio_path}")
         sys.exit(1)
 
+    # Create output directory if it doesn't exist
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     stem = audio_path.stem
-    transcript_path = stem + "_transcript.txt"
-    output_path = args.output or stem + "_notes.md"
+    transcript_path = output_dir / (stem + "_transcript.txt")
+    output_path = args.output or output_dir / (stem + "_notes.md")
 
     transcript = transcribe(str(audio_path), args.model)
-    save_transcript(transcript, transcript_path)
+    save_transcript(transcript, str(transcript_path))
     notes = generate_notes(transcript, args.api_key)
-    save_notes(notes, output_path)
+    save_notes(notes, str(output_path))
 
     print("\n── Preview (first 600 chars) ──────────────────────────────────")
     print(notes[:600])
